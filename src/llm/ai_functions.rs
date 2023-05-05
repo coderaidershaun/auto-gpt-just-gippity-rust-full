@@ -43,6 +43,11 @@ pub fn ai_func_str(message: &String, stage: &Stage) -> Message {
       ]", message)
     },
 
+    // Prompts LLM to summarize key points
+    Stage::TextSummarizer => {
+      format!("Shorten and summarize this into a short few paragraphs without any code or jargon. Keep it factual about what the text says and do not make anything up: {}", message)
+    },
+
     // Evaluates what Python Packages are required for a requested script
     Stage::ProgrammingEvaluatePackages => {
       let ai_function: &str = 

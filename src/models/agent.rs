@@ -10,6 +10,7 @@ pub enum Stage {
   TaskStructure,
   TaskFunctions,
   TaskChecker,
+  TextSummarizer,
   ProgrammingEvaluatePackages,
   ProgrammingEvaluateAPIs,
   ProgrammingEvaluateAPIKeys,

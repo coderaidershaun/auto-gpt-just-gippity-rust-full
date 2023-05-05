@@ -4,6 +4,15 @@ use tokio::process::Command as TokioCommand;
 use std::fs;
 
 
+// Trims string to length
+pub fn trim_string_to_length(s: &str, max_length: usize) -> String {
+  s.chars()
+    .enumerate()
+    .filter_map(|(i, c)| if i < max_length { Some(c) } else { None })
+    .collect::<String>()
+}
+
+
 // Saves LLM generated script to file to be executed
 pub fn save_script_to_python_file(script: &str, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
   let mut file = File::create(filename)?;

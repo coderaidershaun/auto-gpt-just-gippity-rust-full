@@ -1,9 +1,9 @@
+use crate::helpers::helpers::{save_script_to_python_file, execute_python_script, trim_string_to_length};
 use crate::models::plugins::{YTSearchResponse, APIEndpointKey};
 use crate::models::provider::Message;
 use crate::models::agent::Stage;
 use crate::llm::gpt_call_api::call_ai_llm;
 use crate::llm::ai_functions::ai_func_str;
-use crate::helpers::helpers::{save_script_to_python_file, execute_python_script};
 use reqwest::Client;
 use scraper::{Html, Selector};
 use serde_json::Value;
@@ -68,24 +68,42 @@ pub async fn search_google(search_query: &str) -> Result<(), Box<dyn std::error:
 }
 
 
-pub async fn scrape_webpage_data(site_url: &str) -> Result<String, Box<dyn std::error::Error>> {
-  // Description: Scrapes website data for a given site url
+// Request human to perform a task and provide input back
+pub async fn action_from_human(request_to_human: &str) -> String {
+  // Description: Requests for a human to perform a task that a machine write code to perform.
+  // Examples could include: Put food in the freezer, confirm how much you want to invest, etc...
+  // Caution: If a computer on a server can perform this task, this function is not used
+  // Returns: Returns output from human. For example: Task done, I want to invest $1Million
+
+  // Extract objective from user
+  println!("{}", request_to_human);
+  let mut human_response: String = String::new();
+  std::io::stdin().read_line(&mut human_response).expect("Failed to read response");
+  return human_response;
+}
+
+
+// Summarize content or text
+pub async fn llm_summarise_content(input_content: String) -> Result<String, Box<dyn std::error::Error>> {
+  // Description: A large language model receives a body of text and can return a summary of this
+  let api_eval_msg: Message = ai_func_str(&input_content, &Stage::TextSummarizer);
+  let api_endpoints_str: String = call_ai_llm(Vec::from([api_eval_msg])).await?;
+  Ok(api_endpoints_str)
+}
+
+
+// Sumamrize webpage
+pub async fn scrape_and_sumamrize_webpage_content(site_url: &str) -> Result<String, Box<dyn std::error::Error>> {
+  // Description: Scrapes website data for a given site url and uses a large language model to summarize
   // Returns: list of videos containing:  video id, video title, video description, published datetime, list of thumbnails
 
+  // Extract Webpage content
+  println!("Extracting website data...");
   let client: Client = Client::new();
-
-  // Send a GET request to the provided URL
   let resp: reqwest::Response = client.get(site_url).send().await?;
-
-  // Ensure the request succeeded and the content is text
   let body: String = resp.text().await?;
-
-  // Parse the response body as HTML
   let parsed_html: Html = Html::parse_document(&body);
-
-  // Create a wildcard CSS selector to target all elements
   let selector: Selector = Selector::parse("*").unwrap();
-
   let mut text_content: String = String::new();
 
   // Iterate through the matching elements and extract text data
@@ -101,22 +119,15 @@ pub async fn scrape_webpage_data(site_url: &str) -> Result<String, Box<dyn std::
       text_content.push_str(" ");
   }
 
-  Ok(text_content)
-}
+  // Trim content size
+  let trimmed_content: String = trim_string_to_length(text_content.as_str(), 300);
 
+  // Summarize content
+  println!("Text Summarizer: summerizing webpage content...");
+  let webpage_summary: String = llm_summarise_content(trimmed_content).await?;
 
-// Request human to perform a task and provide input back
-pub async fn action_from_human(request_to_human: &str) -> String {
-  // Description: Requests for a human to perform a task that a machine write code to perform.
-  // Examples could include: Put food in the freezer, confirm how much you want to invest, etc...
-  // Caution: If a computer on a server can perform this task, this function is not used
-  // Returns: Returns output from human. For example: Task done, I want to invest $1Million
-
-  // Extract objective from user
-  println!("{}", request_to_human);
-  let mut human_response: String = String::new();
-  std::io::stdin().read_line(&mut human_response).expect("Failed to read response");
-  return human_response;
+  // Return output
+  Ok(webpage_summary)
 }
 
 
@@ -213,8 +224,6 @@ pub async fn python_code_programmer(required_code_solution: &str) -> Result<(), 
   // Save script to file
   println!("Saving programmer script...");
   save_script_to_python_file(programmer_senior_code.as_str(), script_path)?;
-
-
   Ok(())
 }
 
@@ -242,14 +251,18 @@ mod tests {
   #[tokio::test]
   async fn searches_google() {
     let query: &str = "Best place to eat near me";
-    let google_search_res = search_google(query).await;
+    let google_search_res: Result<(), Box<dyn std::error::Error>> = search_google(query).await;
   }
 
   #[tokio::test]
-  async fn scrapes_webpage_data() {
+  async fn scrapes_and_summarizes_webpage_data() {
     let query: &str = "https://cryptowizards.net";
-    let webpage_data = scrape_webpage_data(query).await;
-    dbg!(webpage_data);
+    let webpage_summary_res: Result<String, Box<dyn std::error::Error>> = scrape_and_sumamrize_webpage_content(query).await;
+    dbg!(&webpage_summary_res);
+    match webpage_summary_res {
+      Ok(_) => assert!(true),
+      Err(_) => assert!(false),
+    }
   }
 
   #[tokio::test]
