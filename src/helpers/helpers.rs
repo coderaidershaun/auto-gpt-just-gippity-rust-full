@@ -14,16 +14,21 @@ pub fn save_script_to_python_file(script: &str, filename: &str) -> Result<(), Bo
 
 // Remove any files named output
 fn remove_any_existing_output_files() -> Result<(), Box<dyn std::error::Error>> {
-  let output_dir = "/Users/shaun/Code/DEVELOPMENT/justgippity2/backend/";
+  let target_dir = "/Users/shaun/Code/DEVELOPMENT/justgippity2/backend/";
+  let keyword = "output";
 
   // Read the directory and filter out any errors
-  let entries = fs::read_dir(output_dir)?.filter_map(Result::ok);
+  let entries = fs::read_dir(target_dir)?.filter_map(Result::ok);
 
-  // Iterate through each entry and remove the file if it's a file
+  // Iterate through each entry and remove the file if it's a file and contains the keyword
   for entry in entries {
       let path = entry.path();
       if path.is_file() {
-          fs::remove_file(path)?;
+          let file_name = path.file_name().unwrap().to_string_lossy().to_string();
+
+          if file_name.contains(keyword) {
+              fs::remove_file(path)?;
+          }
       }
   }
 
