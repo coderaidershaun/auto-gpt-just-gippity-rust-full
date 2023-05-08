@@ -1,8 +1,10 @@
 use std::io::prelude::*;
 use std::fs::File;
-use tokio::process::Command as TokioCommand;
 use std::fs;
+use tokio::process::Command as TokioCommand;
 
+use std::env;
+use std::path::PathBuf;
 
 // Trims string to length
 pub fn trim_string_to_length(s: &str, max_length: usize) -> String {
@@ -49,6 +51,19 @@ fn remove_any_existing_output_files() -> Result<(), Box<dyn std::error::Error>> 
 // WARNING: THIS COULD POTENTIALLY BE DANGEROUS!!!
 pub async fn execute_python_script(script_path: &str) -> Result<(), Box<dyn std::error::Error>> {
 
+  fn get_project_root() -> PathBuf {
+    let current_exe_path = env::current_exe().expect("Failed to get current exe path");
+    let mut project_root = current_exe_path.parent().expect("Failed to get parent directory").to_path_buf();
+    while project_root.file_name().expect("Failed to get file name") != "target" {
+        project_root.pop();
+    }
+    project_root.pop(); // Move up one directory from 'target' to the project root
+    project_root
+  }
+
+  let project_root = get_project_root();
+  let output_dir = project_root.join("output"); // Set the desired output directory
+
   // Remove exiting output files
   let remove_res: Result<(), Box<dyn std::error::Error>> = remove_any_existing_output_files();
   if let Err(_) =  remove_res{
@@ -59,6 +74,8 @@ pub async fn execute_python_script(script_path: &str) -> Result<(), Box<dyn std:
   let python_exec_path: &str = "/Users/shaun/Code/DEVELOPMENT/justgippity2/backend/pythonscripts/venv/bin/python3";
   let output = TokioCommand::new(python_exec_path)
     .arg(script_path)
+    .arg("--output-dir")
+    .arg(output_dir)
     .output()
     .await?;
 

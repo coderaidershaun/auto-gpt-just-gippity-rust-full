@@ -11,6 +11,7 @@ pub enum Stage {
   TaskFunctions,
   TaskInputChecker,
   TextSummarizer,
+  Communicator,
   ProgrammingEvaluatePackages,
   ProgrammingEvaluateAPIs,
   ProgrammingEvaluateAPIKeys,

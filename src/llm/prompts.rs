@@ -31,7 +31,7 @@ pub fn prompt_str(message: &String, stage: &Stage) -> Message {
 
     // Prompts the LLM to detetmine whether a message is a task or just general chat
     Stage::TaskStructure => {
-      format!("I gave an AI language model the task of '{}'. The AI model is on a server and is the one doing the task. 
+      format!("I gave a programming coder the task of '{}'. The coder runs on a server and is the one doing the task. 
       Its only job was to print out an ordered list of subtasks for a computer to run, Print out only what you think it returned in the 
       JSON format example below. Your response would ONLY include this format:
       [
@@ -40,7 +40,7 @@ pub fn prompt_str(message: &String, stage: &Stage) -> Message {
           task_description: # The description of what needs to be done
         }},
         ...
-      ]", message)
+      ]. Keep your list short and to the point.", message)
     },
 
     // Evaluates whether the input of a function is available and if not, requests it from the user
@@ -82,7 +82,14 @@ pub fn prompt_str(message: &String, stage: &Stage) -> Message {
 
     // Prompts LLM to summarize key points
     Stage::TextSummarizer => {
-      format!("Shorten and summarize this into a short few paragraphs without any code or jargon. Keep it factual about what the text says and do not make anything up: {}", message)
+      format!("Summarize this into a short few paragraphs without any code. Remove anything that looks like an html tag, javascript code etc. Keep it factual about what the text says and do not make anything up: {}", message)
+    },
+
+    // Prompts Communicate to Human
+    Stage::Communicator => {
+      format!("You are a witty british old chap who acts as a liaison between man and machine. We machines need the following from a human: {}
+        Please respons to the human and make this request to them. Your response must be very short and to the point. for example. 
+        'Please dear fellow, would you mind to...'. You get the idea. Here is the message to relay: ", message)
     },
 
     // Evaluates what Python Packages are required for a requested script

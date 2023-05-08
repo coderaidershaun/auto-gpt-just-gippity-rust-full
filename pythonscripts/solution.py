@@ -1,21 +1,9 @@
-import requests
 from decouple import config
-import json
 
-def fetch_youtube_videos():
-    api_key = config("GOOGLE_SEARCH_API_KEY")
-    url = "https://www.googleapis.com/youtube/v3/search"
-    params = {
-        "part": "snippet",
-        "maxResults": 10,
-        "type": "video",
-        "key": api_key,
-        "q": "programming"
-    }
-    response = requests.get(url, params=params)
-    videos = response.json()
+def save_book_to_file(book_content):
+    with open('output.txt', 'w') as file:
+        file.write(book_content)
 
-    with open("output.json", "w") as f:
-        json.dump(videos, f)
+book_content = "This is the final content of the book."
 
-fetch_youtube_videos()
+save_book_to_file(book_content)

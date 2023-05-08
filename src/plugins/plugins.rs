@@ -11,13 +11,16 @@ use tokio::process::Command as AsyncCommand;
 use std::env;
 use dotenv::dotenv;
 
+use std::path::PathBuf;
+
+
 /// YouTube: API Instructions: https://developers.google.com/youtube/v3/docs/search/list
 /// Search: Add Search Engine: https://programmablesearchengine.google.com/controlpanel/all
 /// Search: API Key and Instructions: https://developers.google.com/custom-search/v1/overview
 
 
 // Search YT and obtain video metadata information
-pub async fn search_youtube_for_video_metadata(query: &str) -> Result<YTSearchResponse, Box<dyn std::error::Error>> {
+pub async fn search_youtube_for_video_metadata(query: &str) -> Result<String, Box<dyn std::error::Error>> {
   // Description: Searches YouTube to find a list of up to 30 videos
   // Returns: list of videos containing:  video id, video title, video description, published datetime, list of thumbnails
   dotenv().ok();
@@ -37,13 +40,14 @@ pub async fn search_youtube_for_video_metadata(query: &str) -> Result<YTSearchRe
 
   // Construct and return response
   let req_response: reqwest::Response = reqwest::get(&request_url).await?;
-  let response_deserialized: YTSearchResponse = req_response.json().await?;
-  Ok(response_deserialized)
+  let response_deserialized: serde_json::Value = req_response.json().await?;
+  let response: String = format!("{:?}", response_deserialized);
+  Ok(response)
 }
 
 
 // Search Google and obtain search urls
-pub async fn search_google(search_query: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn search_google(search_query: &str) -> Result<String, Box<dyn std::error::Error>> {
   // Description: Searches Google based on input query for up to 30 results
   // Returns: list of videos containing:  video id, video title, video description, published datetime, list of thumbnails
   dotenv().ok();
@@ -60,35 +64,30 @@ pub async fn search_google(search_query: &str) -> Result<(), Box<dyn std::error:
       base_url, api_key, cx_id, search_query, num_results
   );
 
-  let response: reqwest::Response = reqwest::get(&request_url).await?;
-  let result: serde_json::Value = response.json().await?;
-
-  println!("Result: {:#?}", result);
-  Ok(())
+  // Return result
+  let req_response: reqwest::Response = reqwest::get(&request_url).await?;
+  let response_deserialized: serde_json::Value = req_response.json().await?;
+  let response: String = format!("{:?}", response_deserialized);
+  Ok(response)
 }
 
 
 // Request human to perform a task and provide input back
-pub async fn action_from_human(request_to_human: &str) -> String {
+pub async fn action_from_human(request_to_human: &str) -> Result<String, Box<dyn std::error::Error>> {
   // Description: Requests for a human to perform a task that a machine write code to perform.
   // Examples could include: Put food in the freezer, confirm how much you want to invest, etc...
   // Caution: If a computer on a server can perform this task, this function is not used
   // Returns: Returns output from human. For example: Task done, I want to invest $1Million
 
+  // Get nicely worded request for human:
+  let message: Message = prompt_str(&request_to_human.to_string(), &Stage::Communicator);
+  let human_request_str: String = call_ai_llm(Vec::from([message])).await?;
+
   // Extract objective from user
-  println!("{}", request_to_human);
+  println!("HUMAN NEEDED: {}", human_request_str);
   let mut human_response: String = String::new();
   std::io::stdin().read_line(&mut human_response).expect("Failed to read response");
-  return human_response;
-}
-
-
-// Summarize content or text
-pub async fn llm_summarise_content(input_content: String) -> Result<String, Box<dyn std::error::Error>> {
-  // Description: A large language model receives a body of text and can return a summary of this
-  let api_eval_msg: Message = prompt_str(&input_content, &Stage::TextSummarizer);
-  let api_endpoints_str: String = call_ai_llm(Vec::from([api_eval_msg])).await?;
-  Ok(api_endpoints_str)
+  Ok(human_response)
 }
 
 
@@ -131,8 +130,17 @@ pub async fn scrape_and_sumamrize_webpage_content(site_url: &str) -> Result<Stri
 }
 
 
+// Summarize content or text
+pub async fn llm_summarise_content(input_content: String) -> Result<String, Box<dyn std::error::Error>> {
+  // Description: A large language model receives a body of text and can return a summary of this
+  let api_eval_msg: Message = prompt_str(&input_content, &Stage::TextSummarizer);
+  let api_endpoints_str: String = call_ai_llm(Vec::from([api_eval_msg])).await?;
+  Ok(api_endpoints_str)
+}
+
+
 // Write executable python code to use later on
-pub async fn python_code_programmer(required_code_solution: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn python_code_programmer(required_code_solution: &str) -> Result<String, Box<dyn std::error::Error>> {
   // Description: An expert code writer receives a request to write python code and saves it to a file to be used later on
   // Use Case: Used when existing functions are not available and custom code can be written to solve a task or problem
   // Examples: Write a python script that makes a flash loan, write some code for a user, write a script to get some information from an API
@@ -224,16 +232,30 @@ pub async fn python_code_programmer(required_code_solution: &str) -> Result<(), 
   // Save script to file
   println!("Saving programmer script...");
   save_script_to_python_file(programmer_senior_code.as_str(), script_path)?;
-  Ok(())
+
+  // Communicate completion
+  let completion_msg = "File saved to solution.py".to_string();
+  Ok(completion_msg)
 }
 
 
 // Execute saved Python script
-pub async fn execute_prewritten_python_script(script_path: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn execute_prewritten_python_script(script_path: &str) -> Result<String, Box<dyn std::error::Error>> {
+
+  println!("HELLO");
+  let current_exe_path = env::current_exe().expect("Failed to get current exe path");
+  let mut project_root = current_exe_path.parent().expect("Failed to get");
+
+  dbg!(&current_exe_path);
+  dbg!(project_root);
+
   // Description: Executes the code written by the python_code_programmer function
   println!("Executing required script...");
   execute_python_script(script_path).await;
-  Ok(())
+
+  // Communicate completion
+  let completion_msg = "File saved to output file".to_string();
+  Ok(completion_msg)
 }
 
 
@@ -245,14 +267,19 @@ mod tests {
   #[tokio::test]
   async fn searches_yt_for_metadata() {
     let query: &str = "Crypto Wizards";
-    let yt_search_res: Result<YTSearchResponse, Box<dyn std::error::Error>> = search_youtube_for_video_metadata(query).await;
+    let yt_search_res: Result<String, Box<dyn std::error::Error>> = search_youtube_for_video_metadata(query).await;
     dbg!(yt_search_res.unwrap());
   }
 
   #[tokio::test]
   async fn searches_google() {
     let query: &str = "Best place to eat near me";
-    let google_search_res: Result<(), Box<dyn std::error::Error>> = search_google(query).await;
+    let google_search_res: Result<String, Box<dyn std::error::Error>> = search_google(query).await;
+    dbg!(&google_search_res);
+    match google_search_res {
+      Ok(_) => assert!(true),
+      Err(_) => assert!(false),
+    }
   }
 
   #[tokio::test]
@@ -269,14 +296,14 @@ mod tests {
   #[tokio::test]
   async fn requests_human_to_perform_task() {
     let request_to_human: &str = "Bake a cake";
-    let human_response: String = action_from_human(request_to_human).await;
+    let human_response: String = action_from_human(request_to_human).await.unwrap();
     dbg!(human_response);
   }
 
   #[tokio::test]
   async fn writes_python_code() {
     let code_request: &str = "write the script that fetches me a list of YouTube videos.";
-    let code_response_res: Result<(), Box<dyn std::error::Error>> = python_code_programmer(code_request).await;
+    let code_response_res: Result<String, Box<dyn std::error::Error>> = python_code_programmer(code_request).await;
     match code_response_res {
       Ok(_) => assert!(true),
       Err(_) => assert!(false),
@@ -286,7 +313,7 @@ mod tests {
   #[tokio::test]
   async fn executes_python_script() {
     let script_path: &str = "/Users/shaun/Code/DEVELOPMENT/justgippity2/backend/pythonscripts/solution.py";
-    let exec_res: Result<(), Box<dyn std::error::Error>> = execute_prewritten_python_script(script_path).await;
+    let exec_res: Result<String, Box<dyn std::error::Error>> = execute_prewritten_python_script(script_path).await;
     match exec_res {
       Ok(_) => assert!(true),
       Err(_) => assert!(false),

@@ -37,6 +37,5 @@ pub struct ApiMessage {
 pub struct Task {
   pub task_number: u32,
   pub function_number: u32,
-  pub task_description: String,
-  pub is_machine: bool,
+  pub task_description: String
 }
