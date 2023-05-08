@@ -2,8 +2,8 @@ use crate::helpers::helpers::{save_script_to_python_file, execute_python_script,
 use crate::models::plugins::{YTSearchResponse, APIEndpointKey};
 use crate::models::provider::Message;
 use crate::models::agent::Stage;
-use crate::llm::gpt_call_api::call_ai_llm;
-use crate::llm::ai_functions::ai_func_str;
+use crate::llm::request::call_ai_llm;
+use crate::llm::prompts::prompt_str;
 use reqwest::Client;
 use scraper::{Html, Selector};
 use serde_json::Value;
@@ -28,7 +28,7 @@ pub async fn search_youtube_for_video_metadata(query: &str) -> Result<YTSearchRe
   // Construct URL
   let base_url: &str = "https://www.googleapis.com/youtube/v3/search";
   let part: &str = "snippet";
-  let max_results: i32 = 10;
+  let max_results: i32 = 3;
   let search_type: &str = "video";
   let request_url: String = format!(
       "{}?part={}&q={}&maxResults={}&type={}&key={}",
@@ -53,7 +53,7 @@ pub async fn search_google(search_query: &str) -> Result<(), Box<dyn std::error:
   let cx_id: String = env::var("GOOGLE_SEARCH_CX_ID").expect("GOOGLE_SEARCH_CX_ID must be set");
 
   let base_url: &str = "https://www.googleapis.com/customsearch/v1";
-  let num_results: i32 = 10; // Maximum number of search results to fetch
+  let num_results: i32 = 3; // Maximum number of search results to fetch
 
   let request_url: String = format!(
       "{}?key={}&cx={}&q={}&num={}",
@@ -86,7 +86,7 @@ pub async fn action_from_human(request_to_human: &str) -> String {
 // Summarize content or text
 pub async fn llm_summarise_content(input_content: String) -> Result<String, Box<dyn std::error::Error>> {
   // Description: A large language model receives a body of text and can return a summary of this
-  let api_eval_msg: Message = ai_func_str(&input_content, &Stage::TextSummarizer);
+  let api_eval_msg: Message = prompt_str(&input_content, &Stage::TextSummarizer);
   let api_endpoints_str: String = call_ai_llm(Vec::from([api_eval_msg])).await?;
   Ok(api_endpoints_str)
 }
@@ -148,7 +148,7 @@ pub async fn python_code_programmer(required_code_solution: &str) -> Result<(), 
 
   // Evaluate Python Packages
   println!("Programming: Evaluating python packages...");
-  let package_eval_msg: Message = ai_func_str(&required_code_solution.to_string(), &Stage::ProgrammingEvaluatePackages);
+  let package_eval_msg: Message = prompt_str(&required_code_solution.to_string(), &Stage::ProgrammingEvaluatePackages);
   let python_packages_str: String = call_ai_llm(Vec::from([package_eval_msg])).await?;
   let python_packages: Vec<String> = serde_json::from_str(python_packages_str.as_str()).unwrap();
 
@@ -186,14 +186,14 @@ pub async fn python_code_programmer(required_code_solution: &str) -> Result<(), 
 
   // Evaluate API Endpoints
   println!("Programming: Evaluating endpoints...");
-  let api_eval_msg: Message = ai_func_str(&required_code_solution.to_string(), &Stage::ProgrammingEvaluateAPIs);
+  let api_eval_msg: Message = prompt_str(&required_code_solution.to_string(), &Stage::ProgrammingEvaluateAPIs);
   let api_endpoints_str: String = call_ai_llm(Vec::from([api_eval_msg])).await?;
   let api_endpoints: Vec<String> = serde_json::from_str(api_endpoints_str.as_str()).unwrap();
 
   // Evaluate API Keys
   println!("Programming: Evaluating api keys...");
   if api_endpoints.len() > 0 {
-    let api_key_msg: Message = ai_func_str(&required_code_solution.to_string(), &Stage::ProgrammingEvaluateAPIKeys);
+    let api_key_msg: Message = prompt_str(&required_code_solution.to_string(), &Stage::ProgrammingEvaluateAPIKeys);
     let api_keys_str: String = call_ai_llm(Vec::from([api_key_msg])).await?;
     let api_keys: Vec<APIEndpointKey> = serde_json::from_str(api_keys_str.as_str()).unwrap();
 
@@ -211,14 +211,14 @@ pub async fn python_code_programmer(required_code_solution: &str) -> Result<(), 
   let endpoints_msg: String = if api_endpoints.len() > 0 { api_endpoints_str } else { "NONE".to_string() };
   let concat_message: String = format!("PROGRAMMING TASK: {}, USE API ENDPOINTS: {}, PYTHON PACKAGES ALLOWED: {}, SCRIPT SAVE OUTPUT TO LOCATION PATH: {}", 
     required_code_solution, endpoints_msg, python_packages_str, file_path_output);
-  let programmer_junior_msg: Message = ai_func_str(&concat_message, &Stage::ProgrammingJunior);
+  let programmer_junior_msg: Message = prompt_str(&concat_message, &Stage::ProgrammingJunior);
   let programmer_junior_code: String = call_ai_llm(Vec::from([programmer_junior_msg])).await?;
 
   // Construct Junior programmer message
   println!("Programming: Senior programmer working...");
   let concat_code_message: String = format!("PROGRAMMING TASK: {}, USE API ENDPOINTS: {}, PYTHON PACKAGES ALLOWED: {}, JUNIOR CODE: {}. SCRIPT SAVE OUTPUT TO LOCATION PATH: {}. Remember to save output here: {}", 
     required_code_solution, endpoints_msg, python_packages_str, programmer_junior_code, file_path_output, file_path_output);
-  let programmer_senior_msg: Message = ai_func_str(&concat_code_message, &Stage::ProgrammingSenior);
+  let programmer_senior_msg: Message = prompt_str(&concat_code_message, &Stage::ProgrammingSenior);
   let programmer_senior_code: String = call_ai_llm(Vec::from([programmer_senior_msg])).await?;
 
   // Save script to file
@@ -230,6 +230,7 @@ pub async fn python_code_programmer(required_code_solution: &str) -> Result<(), 
 
 // Execute saved Python script
 pub async fn execute_prewritten_python_script(script_path: &str) -> Result<(), Box<dyn std::error::Error>> {
+  // Description: Executes the code written by the python_code_programmer function
   println!("Executing required script...");
   execute_python_script(script_path).await;
   Ok(())

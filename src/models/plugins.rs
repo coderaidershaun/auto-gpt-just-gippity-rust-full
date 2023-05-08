@@ -62,3 +62,10 @@ pub struct APIEndpointKey {
     pub endpoint: String,
     pub api_key_available: u8
 }
+
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TaskArgs {
+    pub argument: String,
+    pub argument_input: String
+}

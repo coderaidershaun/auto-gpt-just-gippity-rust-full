@@ -1,2 +1,2 @@
-pub mod gpt_call_api;
-pub mod ai_functions;
+pub mod request;
+pub mod prompts;

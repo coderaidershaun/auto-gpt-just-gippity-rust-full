@@ -3,7 +3,7 @@ use crate::models::provider::Message;
 
 
 // Call to stringify function 
-pub fn ai_func_str(message: &String, stage: &Stage) -> Message {
+pub fn prompt_str(message: &String, stage: &Stage) -> Message {
 
   // Initialize API key string
   let api_keys: &str = "OPEN_AI_ORG, OPEN_AI_KEY, GOOGLE_CLOUD_API_KEY, GOOGLE_SEARCH_API_KEY, GOOGLE_SEARCH_CX_ID";
@@ -41,6 +41,43 @@ pub fn ai_func_str(message: &String, stage: &Stage) -> Message {
         }},
         ...
       ]", message)
+    },
+
+    // Evaluates whether the input of a function is available and if not, requests it from the user
+    Stage::TaskInputChecker => {
+      format!("fn get_args_available_from_context(context: String, input_function: fn(Any)) -> String {{
+        // Description: Identifies the argument(s) required from a context input
+        // Detail: Takes in a conversational string as context and analyses it against the arguments required (within the input_function) for a function
+
+        // Example 1: 
+        // context = \"Please find me a article from BuzzFeed at https://buzzfeed.com/articles \", input_function = \"fn get_website_info(site_url: String)...\"
+        // json_output = 
+        [
+        {{
+          \"argument\": \"site_url\",
+          \"argument_input: https://buzzfeed.com/articles\"
+        }} 
+        ]
+
+        // Example 2: 
+        // context = \"Get me the paragraphs for search term 'hello' web data from a website \", input_function = \"fn get_web_data(site_url: String, search_term: String)...\"
+        // json_output = 
+        [
+          {{
+            \"argument\": \"site_url\",
+            \"argument_input: None
+          }} ,
+          {{
+            \"argument\": \"search_term\",
+            \"argument_input: 'hello'
+          }} 
+        ]
+
+        // You will see from the above example 2, that because 'site_url' as a required input, but there was no suggestion of it in the context, that it was returned as None.
+        // You will also note that there were two arguments required in example 2, so two items were returned in the JSON object.
+        return println!({{}}, json_output);
+      }}. Here is the input context and input function. Print out what you believe the output of the get_args_available_from_context function will be in JSON format.
+      Do not add any other information, just print ONLY what the function will output. Here is the information you need: {}.", message)
     },
 
     // Prompts LLM to summarize key points

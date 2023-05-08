@@ -5,7 +5,9 @@ mod helpers;
 
 use models::agent::{Agent, Stage};
 use models::provider::{Message, Task};
+use models::plugins::TaskArgs;
 use plugins::plugin_arr::PLUGIN_FUNC_ARR;
+use plugins::plugins::search_youtube_for_video_metadata;
 use serde_json;
 
 
@@ -26,19 +28,19 @@ async fn main() {
 
 
 
-    // // Structure message
-    // let message: Message = Message {
-    //     role: "user".to_string(),
-    //     content: initial_message.clone()
-    // };
+    // Structure message
+    let message: Message = Message {
+        role: "user".to_string(),
+        content: initial_message.clone()
+    };
 
-    // // Create an instance of our agent
-    // let mut agent: Agent = Agent::new(
-    //     "Just Gippity".to_string(), 
-    //     "Shaun".to_string(), 
-    //     initial_message.clone(),
-    //     message
-    // );
+    // Create an instance of our agent
+    let mut agent: Agent = Agent::new(
+        "Just Gippity".to_string(), 
+        "Shaun".to_string(), 
+        initial_message.clone(),
+        message
+    );
 
     // // Determine message for ai function
     // let ai_function_filtration: Message = agent.get_ai_function(&initial_message);
@@ -119,13 +121,15 @@ async fn main() {
     //     }
     // };
 
+    // dbg!(full_tasklist);
+
 
 
     // DELETE !!!!!!!!!
-    let full_tasklist_str_delete = "[\n  {\n    \"task_number\": 1,\n    \"function_number\": 1,\n    \"task_description\": \"Transcribe the YouTube video URL into text\",\n    \"is_machine\": true\n  },\n  {\n    \"task_number\": 2,\n    \"function_number\": 3,\n    \"task_description\": \"Use the large language model to summarize the transcribed video text\",\n    \"is_machine\": true\n  },\n  {\n    \"task_number\": 3,\n    \"function_number\": 2,\n    \"task_description\": \"Optional: Browse any related website URL to gather additional information\",\n    \"is_machine\": true\n  }]";
+    let full_tasklist_str_delete = "[\n    {\n        \"task_number\": 1,\n        \"function_number\": 1,\n        \"task_description\": \"Search YouTube for the desired video metadata based on user query\",\n        \"is_machine\": true\n    },\n    {\n        \"task_number\": 2,\n        \"function_number\": 3,\n        \"task_description\": \"Request a human to watch the video and provide a timestamp-based transcription\",\n        \"is_machine\": false\n    },\n    {\n        \"task_number\": 3,\n        \"function_number\": 5,\n        \"task_description\": \"Use the large language model to extract key points from the transcription\",\n        \"is_machine\": true\n    },\n    {\n        \"task_number\": 4,\n        \"function_number\": 5,\n        \"task_description\": \"Condense the extracted key points into a summary using the large language model\",\n        \"is_machine\": true\n    },\n    {\n        \"task_number\": 5,\n        \"function_number\": 6,\n        \"task_description\": \"Write a python script to convert the summary into JSON format\",\n        \"is_machine\": true\n    },\n    {\n        \"task_number\": 6,\n        \"function_number\": 7,\n        \"task_description\": \"Execute the pre-written python script to convert the summary into JSON format\",\n        \"is_machine\": true\n    },\n    {\n        \"task_number\": 7,\n        \"function_number\": 4,\n        \"task_description\": \"Return the JSON formatted summary to the user\",\n        \"is_machine\": true\n    }\n]";
     let full_tasklist: Vec<Task> = serde_json::from_str(full_tasklist_str_delete).expect("Failed to unwrap tasklist from JSON format to Vec<Task>");
 
-
+    // Loop through and manage tasks
     for task in full_tasklist {
         println!("Task Number: {:?}", task.task_number);
         println!("Function Number: {:?}", task.function_number);
@@ -133,7 +137,43 @@ async fn main() {
         println!("Is Machine: {:?}", task.is_machine);
         println!("");
 
-        // Perform Function
+        // Check task function inputs - Message structure
+        println!("TASK {}:", task.task_number);
+        println!("Checking task inputs to accomplish task: \n'{}'...", task.task_description);
+        let function_str: &str = PLUGIN_FUNC_ARR[task.function_number as usize - 1];
+        let context: &Vec<Message> = &agent.memory;
+        let task_context: String = format!("Context {{ {:?} {} }}", context, task.task_description);
+        let input_message: String = format!("let context = {:?} \n let input_function = {}", task_context, function_str);
+        
+        // Request LLM Feedback
+        agent.stage = Stage::TaskInputChecker;
+        let ai_function_task_checker: Message = agent.get_ai_function(&input_message);
+        let task_check_res: Result<String, Box<dyn std::error::Error>> = agent.get_response(Some(ai_function_task_checker)).await;
+
+        // Extract function arguments
+        let task_args: Vec<TaskArgs> = if let Ok(task_check) = task_check_res {
+            let task_args_decoded: Vec<TaskArgs> = serde_json::from_str(task_check.as_str()).expect("Failed to unwrap task argument inputs from Vec<TaskArgs>");
+            task_args_decoded
+        } else {
+            eprintln!("{:?}", task_check_res);
+            panic!("Failed to retrieve task arguments in correct input")
+        };
+
+        // Match selected function
+        println!("Performing task function {}:", task.function_number);
+        let task_output = match task.function_number {
+            1 => {
+                dbg!(&task_args[0].argument_input);
+                let func_resp = search_youtube_for_video_metadata(&task_args[0].argument_input).await;
+                dbg!(func_resp)
+            },
+            _ => {
+                eprintln!("Missing function number {}", task.function_number);
+                panic!("No such function listed")
+            }
+        };
+
+        // break;
     }
 
     // dbg!(full_tasklist);

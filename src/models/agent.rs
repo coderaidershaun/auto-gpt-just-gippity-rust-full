@@ -1,6 +1,6 @@
 use crate::models::provider::Message;
-use crate::llm::gpt_call_api::call_ai_llm;
-use crate::llm::ai_functions::ai_func_str;
+use crate::llm::request::call_ai_llm;
+use crate::llm::prompts::prompt_str;
 
 
 // Set Stage
@@ -9,7 +9,7 @@ pub enum Stage {
   Filter,
   TaskStructure,
   TaskFunctions,
-  TaskChecker,
+  TaskInputChecker,
   TextSummarizer,
   ProgrammingEvaluatePackages,
   ProgrammingEvaluateAPIs,
@@ -54,6 +54,6 @@ impl Agent {
 
   // Extract AI Function String
   pub fn get_ai_function(&self, message: &String) -> Message {
-    ai_func_str(message, &self.stage)
+    prompt_str(message, &self.stage)
   }
 }
